@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html>
+<style type ="text/css">
+  div.myNum 
+	{
+		width:50px;
+		height:50px;
+		padding:10px 0 0 0;
+		background-color:#FFFFFF;
+		color:#999999;
+		border: 1px solid #999999;
+		float:left;
+		font-size:30px;
+		margin-left:20px;
+	}
+</style>
+<body onload="initSudoku()">
+<div id = "divHead">
+    <h1>Sudoku:</h1>
+    <label id = "labelHead"> &nbsp </label>
+    <br>
+    <label id = "labelSpot"> &nbsp </label>
+    <hr>
+</div>
+
+<div id = "divCrtl">
+    <label>Select Level : &nbsp &nbsp </label>
+    <input type ="radio"  name = "radLvl" id = "radLvlEasy" value = 1 onclick = "setSpotLvl(1)" /><label> Easy &nbsp &nbsp </label>
+    <input type ="radio"  name = "radLvl" id = "radLvlMed" value = 2 onclick = "setSpotLvl(2)" /><label> Medium &nbsp &nbsp </label>
+    <input type ="radio"  name = "radLvl" id = "radLvlHard" value = 3 onclick = "setSpotLvl(3)" /><label> Hard &nbsp &nbsp </label>
+    <input type="button" id="btnGen" value="GenerateSudoku" onclick = "generateSudoku()" />
+    <br>
+    <input type="button" id="btnReset" value="RestartSudoku" onclick = "restartSudoku()" />
+    <input type="button" id="btnClear" value="ClearTable" onclick = "clearTable()" />
+    <br>
+    <input type="button" id="btnCand" value="DisplayCandidate" onclick = "displayCandidate()" />
+    <input type="button" id="btnSol" value="DisplaySolution" onclick = "displaySolution()" />
+    <input type="button" id="btnNextSol" value="NextSolution" onclick = "displayNextSolution()" />
+    <br>
+    <hr>
+</div>
+<div id = "divNum" style = "text-align:center;">
+    <div style = "clear:both;  text-align:left;">
+        <label id ="labelNum">Select number : 1</label>
+    </div>
+    <div id = "divNum0" class = "myNum" onclick = "setCurrentNum(0)"> </div>
+    <div id = "divNum1" class = "myNum" onclick = "setCurrentNum(1)">1</div>
+    <div id = "divNum2" class = "myNum" onclick = "setCurrentNum(2)">2</div>
+    <div id = "divNum3" class = "myNum" onclick = "setCurrentNum(3)">3</div>
+    <div id = "divNum4" class = "myNum" onclick = "setCurrentNum(4)">4</div>
+    <div id = "divNum5" class = "myNum" onclick = "setCurrentNum(5)">5</div>
+    <div id = "divNum6" class = "myNum" onclick = "setCurrentNum(6)">6</div>
+    <div id = "divNum7" class = "myNum" onclick = "setCurrentNum(7)">7</div>
+    <div id = "divNum8" class = "myNum" onclick = "setCurrentNum(8)">8</div>
+    <div id = "divNum9" class = "myNum" onclick = "setCurrentNum(9)">9</div>
+    <div style = "clear:both;">
+        <br>
+    </div>
+</div>
+<div id ="divMyTable">
+</div>
+
+
+<script>
+var tSize = 9;
+var currentNum = 1;
+var stopGen = false;
+var validSudoku = true;
+var countSol = 0;
+var countSolMax = 100;
+var stopAt2ndSolFound = true;
+var thSolution = 0;
+var spotLvlArr = new Array(0,42,50,58);
+var spotLvl = 1;
+var spotOnBoard =0;
+var sCell = new Array(tSize+1);
+var solution = new Array(countSolMax);
+var backup = new Array(tSize+1);
+var boolShowCand = false;
+
+for (var i=1; i<=tSize; i++)
+{
+    sCell[i] = new Array(tSize+1);
+    backup[i] = new Array(tSize+1);
+}
+
+for (var row=1; row<=tSize; row++)
+{
+    for (var col=1; col<=tSize; col++)
+    {
+        sCell[col][row] = new SudokuCell(col,row);
+        backup[col][row] = 0;
+        
+    }
+}
+
+for (var i =0; i<countSolMax; i++)
+{
+    solution[i] = new Array(tSize+1);
+    for (var j =1; j<=tSize; j++)
+    {
+        solution[i][j] = new Array(tSize+1);
+    }
+}
+
+for (var i =0; i<countSolMax; i++)
+{
+    for (var row =1; row<=tSize; row++)
+    {
+        for (var col =1; col<=tSize; col++)
+        {
+            solution[i][col][row] = 0;
+        }
+    }
+}
+
+var tIDL;
+var tArr = new Array();
+var tIDCol = new Array();
+var tIDRow = new Array();
+
+
+function setCurrentNum(aNum)
+{
+    for (var i=0;i<=tSize; i++)
+    {   
+        if (i == aNum)
+        {
+            document.getElementById("divNum"+i).style.color = "#000000";
+            document.getElementById("divNum"+i).style.borderColor = "#000000";
+            currentNum = i;
+            if (i !=0)
+            {
+                document.getElementById("labelNum").innerHTML = "Select number : "+i;
+            }
+            else
+            {
+                document.getElementById("labelNum").innerHTML = "Select number : "+"Blank";    
+            }
+        }
+        else
+        {
+            document.getElementById("divNum"+i).style.color = "#999999";
+            document.getElementById("divNum"+i).style.borderColor = "#999999";
+        }
+    }
+    
+}
+
+
+function setNumToTxtAns(aCol,aRow)
+{
+
+    var ansID = "txtAnsCol"+aCol+"Row"+aRow;
+    var candID = "txtCandCol"+aCol+"Row"+aRow;
+    
+    
+    if (currentNum !=0)
+    {
+        if (isOK(currentNum,aCol,aRow))
+        {
+            document.getElementById("labelNum").innerHTML = "Select number : "+currentNum;
+            sCell[aCol][aRow].numGiven = Number(currentNum); //
+            var tmpNum = Number(document.getElementById(ansID).value);
+            addCandidateInBCR(tmpNum,aCol,aRow); 
+            document.getElementById(ansID).value  = currentNum;
+            excCandidateInBCR(currentNum,aCol,aRow);   
+            document.getElementById(candID).value ="";
+               
+        }
+        else
+        {
+            document.getElementById("labelNum").innerHTML = "Select number : "+currentNum+" can not be there";
+        }
+        
+    }
+    else
+    {
+        var tmpNum = Number(document.getElementById(ansID).value);
+        sCell[aCol][aRow].numGiven = 0;
+        document.getElementById(ansID).value  = "";
+        addCandidateInBCR(tmpNum,aCol,aRow);
+  
+        sCell[aCol][aRow].clearCandidate(); //***
+        for (var n=1; n<=9;n++)
+        {
+            if (isOK(n,aCol,aRow))
+            {
+                sCell[aCol][aRow].addCandidate(n);
+            }
+        } 
+        document.getElementById(candID).value = sCell[aCol][aRow].getCandidate();   
+    }
+    
+}
+
+function initSudoku()
+{
+    createTable();
+    document.getElementById("radLvlEasy").checked = true;
+    generateSudoku();
+    displayCandidate();
+    setCurrentNum(1);
+}
+
+function setSpotLvl(aLvl)
+{
+    spotLvl = aLvl;    
+}
+
+function myIndexOf(aArray,aElement)
+{
+    var indexF = -1;
+    var i = 0;
+    while (indexF<0 && i<aArray.length)
+    {
+        if (aArray[i] == aElement)
+        {
+            indexF = i;
+        }
+        i = i+1;    
+    }
+    
+    return indexF;
+}
+
+function restartSudoku()
+{
+    var ansID;
+    var candID;
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            candID = "txtCandCol"+col+"Row"+row;
+            document.getElementById(candID).value = "";
+            ansID = "txtAnsCol"+col+"Row"+row;
+            if (backup[col][row] != 0)
+            {              
+                document.getElementById(ansID).value = backup[col][row];
+            }
+            else
+            {
+                document.getElementById(ansID).value = "";
+            }
+        }
+    }
+    calcCandidate();
+    document.getElementById("labelHead").innerHTML = " &nbsp ";
+    document.getElementById("btnNextSol").disabled=true;
+}
+
+function clearTable()
+{
+    var ansID,candID;
+    
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            ansID = "txtAnsCol"+col+"Row"+row;
+            candID = "txtCandCol"+col+"Row"+row;
+            document.getElementById(ansID).value = "";
+            document.getElementById(candID).value = "";
+            sCell[col][row].numGiven = 0; //////
+        }
+    }
+    
+    calcCandidate();
+    document.getElementById("labelSpot").innerHTML = " &nbsp ";
+    document.getElementById("labelHead").innerHTML = " &nbsp ";
+    document.getElementById("btnNextSol").disabled=true;
+}
+
+function generateSudoku()
+{
+    
+    clearAnsAllCell();
+    findCandidateAllCell();
+    shuffleCandidateAllCell();
+    stopGen = false;
+    generateAns(1,1); 
+    generateSpot(spotLvl);
+    displaySudokuBoard();
+    calcCandidate();
+    document.getElementById("labelSpot").innerHTML = "Blank Spot: "+spotOnBoard;
+    document.getElementById("labelHead").innerHTML = " &nbsp ";
+    document.getElementById("btnNextSol").disabled=true;
+  
+}
+
+function calcCandidate()
+{
+    var ansID;
+    var candID;
+    
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            ansID = "txtAnsCol"+col+"Row"+row;
+            if (isNaN(Number(document.getElementById(ansID).value.substring(0,1))))
+            {
+                sCell[col][row].numGiven = 0;
+            }
+            else
+            {
+                sCell[col][row].numGiven = Number(document.getElementById(ansID).value.substring(0,1));
+            }
+        }
+    }
+
+    findCandidateAllCell();
+    
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            candID = "txtCandCol"+col+"Row"+row;
+            if (sCell[col][row].numGiven == 0)
+            {   
+                document.getElementById(candID).value = sCell[col][row].getCandidate();
+            }
+            else
+            {
+                document.getElementById(candID).value = "";
+            }
+        }
+    }   
+}
+
+function displayCandidate()
+{
+    var ansID;
+    var candID;
+    
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+                candID = "txtCandCol"+col+"Row"+row;
+                if (boolShowCand)
+                {   
+                    document.getElementById(candID).style.color = "white";   
+                }
+                else
+                {
+                    document.getElementById(candID).style.color = "green";
+                }   
+        }
+    }
+    
+    if (boolShowCand)
+    {
+        boolShowCand = false;
+    }
+    else
+    {
+        boolShowCand = true;    
+    }
+}
+
+function displaySudokuBoard()
+{
+    var ansID;
+    
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+        
+            candID = "txtCandCol"+col+"Row"+row;
+            document.getElementById(candID).value = "";
+            
+            ansID = "txtAnsCol"+col+"Row"+row;
+            if (sCell[col][row].numGiven !=0)
+            {
+                document.getElementById(ansID).value = sCell[col][row].numGiven;
+                backup[col][row] = sCell[col][row].numGiven;
+            }
+            else
+            {
+                document.getElementById(ansID).value = "";
+                backup[col][row] = sCell[col][row].numGiven;
+            }
+        }
+    }
+}
+
+function displaySolution()
+{
+    //var candID;
+    var ansID;
+    var spot = 0;
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            ansID = "txtAnsCol"+col+"Row"+row;
+            if (isNaN(Number(document.getElementById(ansID).value.substring(0,1))))
+            {
+                sCell[col][row].numGiven = 0;
+                backup[col][row] = sCell[col][row].numGiven;
+                
+            }
+            else
+            {
+                sCell[col][row].numGiven = Number(document.getElementById(ansID).value.substring(0,1));
+                backup[col][row] = sCell[col][row].numGiven;
+                if (sCell[col][row].numGiven == 0)
+                {
+                    spot = spot+1;
+                }
+            }
+        }
+    }
+    
+    spotOnBoard = spot;
+    document.getElementById("labelSpot").innerHTML = "Blank Spot: "+spotOnBoard;
+    
+    stopAt2ndSolFound = false;
+    findSol();
+    thSolution = 0;
+    window.scrollTo(0,0);
+    if (validSudoku)
+    {
+        document.getElementById("labelHead").innerHTML = "valid 1 solution found";
+        document.getElementById("btnNextSol").disabled=true;
+    }
+    else
+    {
+        if (countSol <= countSolMax)
+        {
+            if (countSol == 0)
+            {
+                document.getElementById("labelHead").innerHTML = "!Invalid "+countSol+" solution found";
+                document.getElementById("btnNextSol").disabled=true;    
+            }
+            else
+            {
+                document.getElementById("labelHead").innerHTML = "!Invalid "+countSol+" solutions found: this is solution-"+(thSolution+1);
+                document.getElementById("btnNextSol").disabled=false;
+            }
+        }
+        else
+        {
+            
+            document.getElementById("labelHead").innerHTML = "!Invalid more than " +countSolMax+" solutions found: this is solution-"+(thSolution+1);
+            document.getElementById("btnNextSol").disabled=false;
+        }
+    }
+    
+    if (countSol != 0)
+    {
+        for (var row=1; row<=tSize; row++)
+        {
+            for (var col=1; col<=tSize; col++)
+            {
+                //candID = "txtCandCol"+col+"Row"+row;
+                ansID = "txtAnsCol"+col+"Row"+row;
+                //document.getElementById(candID).value = sCell[col][row].getCandidate();
+                document.getElementById(ansID).value = solution[thSolution][col][row];
+
+            }
+        }
+    }
+}
+
+function displayNextSolution()
+{
+    var ansID;
+    thSolution = thSolution+1;
+    
+    if (countSol <= countSolMax)
+    {
+        if (thSolution == countSol)
+        {
+            thSolution = 0;
+        }
+        document.getElementById("labelHead").innerHTML = "!Invalid " +countSol+" solutions found: this is solution-"+(thSolution+1);
+    }
+    else
+    {
+        if (thSolution == countSol-1)
+        {
+            thSolution = 0;
+        }
+        document.getElementById("labelHead").innerHTML = "!Invalid more than " +countSolMax+" solutions found: this is solution-"+(thSolution+1);    
+    }
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            ansID = "txtAnsCol"+col+"Row"+row;
+            document.getElementById(ansID).value = solution[thSolution][col][row];
+        }
+    }
+
+}
+
+function presetSudoku(aPattern)
+{
+    switch (aPattern)
+    {
+        case 1:
+            //valid sudoku 1 solution 
+            sCell[1][1].numGiven = 4;
+            sCell[3][2].numGiven = 9;
+            sCell[4][1].numGiven = 7;
+            sCell[4][3].numGiven = 9;
+            sCell[7][1].numGiven = 6;
+            sCell[8][1].numGiven = 1;
+            sCell[9][1].numGiven = 9;
+            sCell[9][3].numGiven = 2;
+        
+            sCell[2][5].numGiven = 6;
+            sCell[1][6].numGiven = 5;
+            sCell[2][6].numGiven = 2;
+            sCell[4][4].numGiven = 8;
+            sCell[5][5].numGiven = 3;
+            sCell[6][6].numGiven = 4;
+            sCell[8][4].numGiven = 6;
+            sCell[9][4].numGiven = 4;
+            sCell[8][5].numGiven = 8;
+        
+            sCell[1][7].numGiven = 1;
+            sCell[1][9].numGiven = 9;
+            sCell[2][9].numGiven = 4;
+            sCell[3][9].numGiven = 7;
+            sCell[6][7].numGiven = 5;
+            sCell[6][9].numGiven = 3;
+            sCell[7][8].numGiven = 3;
+            sCell[9][9].numGiven = 8;
+            break;
+        case 2:
+            //invalid sudoku 3 solution 
+            sCell[1][1].numGiven = 4;
+            sCell[3][2].numGiven = 9;
+            sCell[4][1].numGiven = 7;
+            sCell[4][3].numGiven = 9;
+            sCell[7][1].numGiven = 6;
+            sCell[8][1].numGiven = 1;
+            //sCell[9][1].numGiven = 9;
+            sCell[9][3].numGiven = 2;
+        
+            sCell[2][5].numGiven = 6;
+            sCell[1][6].numGiven = 5;
+            sCell[2][6].numGiven = 2;
+            sCell[4][4].numGiven = 8;
+            sCell[5][5].numGiven = 3;
+            sCell[6][6].numGiven = 4;
+            sCell[8][4].numGiven = 6;
+            sCell[9][4].numGiven = 4;
+            sCell[8][5].numGiven = 8;
+        
+            sCell[1][7].numGiven = 1;
+            sCell[1][9].numGiven = 9;
+            sCell[2][9].numGiven = 4;
+            sCell[3][9].numGiven = 7;
+            sCell[6][7].numGiven = 5;
+            sCell[6][9].numGiven = 3;
+            sCell[7][7].numGiven = 3; // change from [7][8] to [7][7]
+            sCell[9][9].numGiven = 8;
+            break;
+        case 3:
+            //invalid sudoku 0 solution 
+            sCell[1][1].numGiven = 4;
+            sCell[3][2].numGiven = 9;
+            sCell[4][1].numGiven = 7;
+            sCell[4][3].numGiven = 9;
+            sCell[7][1].numGiven = 6;
+            sCell[8][1].numGiven = 1;
+            sCell[9][1].numGiven = 9;
+            sCell[9][3].numGiven = 2;
+        
+            sCell[2][5].numGiven = 6;
+            sCell[1][6].numGiven = 5;
+            sCell[2][6].numGiven = 2;
+            sCell[4][4].numGiven = 8;
+            sCell[5][5].numGiven = 3;
+            sCell[6][5].numGiven = 2; // additional
+            sCell[6][6].numGiven = 4;
+            sCell[7][4].numGiven = 2; // additional
+            sCell[8][4].numGiven = 6;
+            sCell[9][4].numGiven = 4;
+            sCell[8][5].numGiven = 8;
+        
+            sCell[1][7].numGiven = 1;
+            sCell[1][9].numGiven = 9;
+            sCell[2][9].numGiven = 4;
+            sCell[3][9].numGiven = 7;
+            sCell[6][7].numGiven = 5;
+            sCell[6][9].numGiven = 3;
+            sCell[7][7].numGiven = 3; // change from [7][8] to [7][7]
+            sCell[8][9].numGiven = 2; // additional
+            sCell[9][9].numGiven = 8;
+            break;
+    }
+}
+
+function findSol()
+{
+    validSudoku = true;
+    countSol = 0;
+    recursiveSol(1,1);
+    if (countSol != 1)
+    {
+        validSudoku = false;
+    }
+}
+
+function recursiveSol(aCol,aRow)
+{
+    var col,row;
+    col = aCol;
+    row = aRow;
+    
+    if (row <= tSize)
+    {
+        if (sCell[col][row].numGiven == 0)
+        {
+            for (var num = 1; num<=9; num++)
+            {
+                if (isOK(num,col,row))
+                {
+                    sCell[col][row].numGiven = num;
+                    if (col<tSize)
+                    {
+                        recursiveSol(col+1,row);
+                    }
+                    else
+                    {
+                        recursiveSol(1,row+1);
+                    }
+                    sCell[col][row].numGiven = 0;
+                    if (!(validSudoku))
+                    {
+                        return;
+                    }
+                }// end if isOK
+            }//end for loop num
+        }// end if this cell dose not have answer yet
+        else
+        {
+            if (col<tSize)
+            {
+                recursiveSol(col+1,row);
+            }
+            else
+            {
+                recursiveSol(1,row+1);
+            }
+        }//end else-if this cell dose not have answer yet
+    }//end if row>tSize = found solution
+    else
+    {
+        countSol = countSol+1;
+        if (countSol==1)
+        {
+            validSudoku = true;
+            for (var r = 1; r<=tSize; r++)
+            {
+                for (var c = 1; c<=tSize; c++)
+                {
+                    solution[countSol-1][c][r]=sCell[c][r].numGiven;                
+                }
+            }
+            
+        }
+        else
+        {
+            if (stopAt2ndSolFound)
+            {
+                validSudoku = false;
+            }
+            else
+            {
+                
+                if (countSol>countSolMax)
+                {
+                    validSudoku = false;
+                }
+                else
+                {
+                    for (var r = 1; r<=tSize; r++)
+                    {
+                        for (var c = 1; c<=tSize; c++)
+                        {
+                            solution[countSol-1][c][r]=sCell[c][r].numGiven;                
+                        }
+                    }
+                }
+            }
+        }
+        return;
+    }
+}
+
+function generateSpot(aLvl)
+{
+    var col,row;
+    var num;
+    var spot = 0;
+    
+    var indexFound,i;
+    var cellID = new Array();
+    
+    for (row =1; row<=tSize; row++)
+    {
+        for (col=1; col<=tSize; col++)
+        {
+            backup[col][row] = sCell[col][row].numGiven;
+            num = col*10+row;
+            cellID.push(num);           
+        }
+    }
+    
+    while (cellID.length>0 && spot<spotLvlArr[aLvl])
+    {
+        num =  Math.floor(Math.random()*cellID.length);
+            
+        col = Math.floor(cellID[num]/10);
+        row = cellID[num]-(col*10);
+
+        sCell[col][row].numGiven = 0;
+        sCell[10-col][10-row].numGiven = 0; //to make it symmetry and generate faster
+        if (col== 5 && row == 5)
+        {
+            spot = spot+1;
+            cellID.splice(num,1);
+        }
+        else
+        {
+            spot = spot+2;
+            cellID.splice(num,1);
+            indexFound = myIndexOf(cellID,(110-col*10-row));
+
+            cellID.splice(indexFound,1);
+     
+        } 
+            
+
+        stopAt2ndSolFound = true;                
+        findSol();
+        if (!(validSudoku))
+        {
+            if (col == 5 && row == 5)
+            {
+                spot = spot-1;
+            }
+            else
+            {
+                spot = spot-2;
+            }
+
+            sCell[col][row].numGiven = backup[col][row];
+            sCell[10-col][10-row].numGiven = backup[10-col][10-row];
+        }
+    }
+    
+    
+    spotOnBoard = spot;
+
+    
+}
+
+function generateAns(aCol,aRow)
+{
+    var col,row;
+    var num,count;
+    
+    col = aCol;
+    row = aRow;
+    
+    if (row <= tSize)
+    {
+        count = 0;
+        
+        while (count < tSize)
+        {
+            num = sCell[col][row].candidate[count];
+            
+            if (isOK(num,col,row))
+            {
+                sCell[col][row].numGiven = num;
+                
+                if (col<tSize)
+                {
+                    generateAns(col+1,row);
+                }
+                else
+                {
+                    generateAns(1,row+1);
+                }
+                
+                if (stopGen)
+                {
+                    return;
+                }
+            }
+            
+            count = count+1;
+        }
+        sCell[col][row].numGiven = 0;
+    
+    }
+    else
+    {
+        stopGen = true;
+    }
+}
+
+function findCandidateAllCell()
+{
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            if (sCell[col][row].numGiven == 0)
+            {
+                sCell[col][row].clearCandidate(); //***
+                for (var n=1; n<=9;n++)
+                {
+                    if (isOK(n,col,row))
+                    {
+                        sCell[col][row].addCandidate(n);
+                    }
+                }
+            }
+        }
+    }
+}
+function addCandidateInBCR(aNum,aCol,aRow)
+{
+    addCandidateInBlock(aNum,aCol,aRow);
+    addCandidateInCol(aNum,aCol,aRow);
+    addCandidateInRow(aNum,aCol,aRow);
+}
+
+function addCandidateInBlock(aNum,aCol,aRow)
+{
+    var row;
+    var col;
+    var candID;
+    var strCand;
+    var strTmp;
+    var strNum = aNum+"";
+    var indexFound;
+    
+    if (aCol<=3 && aRow<=3)
+    {
+        col = 1;
+        row = 1;
+    }
+    if (aCol>3 && aCol <=6 && aRow<=3)
+    {
+        col = 4;
+        row = 1;
+    }
+    if (aCol>6 && aRow<=3)
+    {
+        col = 7;
+        row = 1;
+    }
+    if (aCol<=3 && aRow>3 && aRow<=6)
+    {
+        col = 1;
+        row = 4;
+    }
+    if (aCol>3 && aCol <=6 && aRow>3 && aRow<=6)
+    {
+        col = 4;
+        row = 4;
+    }
+    if (aCol>6 && aRow>3 && aRow<=6)
+    {
+        col = 7;
+        row = 4;
+    }
+    if (aCol<=3 && aRow>6)
+    {
+        col = 1;
+        row = 7;
+    }
+    if (aCol>3 && aCol<=6 && aRow>6)
+    {
+        col = 4;
+        row = 7;
+    }
+    if (aCol>6 && aRow>6)
+    {
+        col = 7;
+        row = 7;
+    }    
+    
+    var tmpCol = col;
+    for (var countRow = 1; countRow<=3; countRow++)
+    {
+        col = tmpCol;
+        for (var countCol = 1; countCol<=3; countCol++)
+        {
+            if (sCell[col][row].numGiven == 0)
+            {
+                if (isOK(aNum,col,row))
+                {
+                    candID = "txtCandCol"+col+"Row"+row;
+                    strCand = document.getElementById(candID).value;
+                    if (strCand.indexOf(strNum)< 0)
+                    {
+                        indexFound = -1;
+                        var candTmp;
+                        var i =0;
+                        while ( i<strCand.length && indexFound <0)
+                        {
+                            candTmp = Number(strCand.charAt(i));
+                            if (aNum>candTmp)
+                            {
+                                i = i+1;
+                            }
+                            else
+                            {
+                                indexFound = i;
+                            }
+                        }
+                        if (indexFound<0)
+                        {
+                            indexFound = i;
+                        }
+                        strTmp = strCand.substring(0,indexFound)+strNum+strCand.substring(indexFound,strCand.length);
+                        strCand = strTmp;
+                        document.getElementById(candID).value = strCand;
+                    }
+                }
+            }
+            col = col+1;    
+        }
+        row = row+1;
+    } 
+}
+
+function addCandidateInCol(aNum,aCol,aRow)
+{
+    var row = aRow;
+    var col;
+    var candID;
+    var strCand;
+    var strTmp;
+    var strNum = aNum+"";
+    var indexFound;
+    
+    for (var countCol = 1; countCol<=tSize; countCol++)
+    {
+        col = countCol;
+        if (sCell[col][row].numGiven == 0)
+        {
+            if (isOK(aNum,col,row))
+            {
+                candID = "txtCandCol"+col+"Row"+row;
+                strCand = document.getElementById(candID).value;
+                if (strCand.indexOf(strNum)< 0)
+                {
+                indexFound = -1;
+                var candTmp;
+                var i =0;
+                while ( i<strCand.length && indexFound <0)
+                {
+                    candTmp = Number(strCand.charAt(i));
+                    if (aNum>candTmp)
+                    {
+                        i = i+1;
+                    }
+                    else
+                    {
+                        indexFound = i;
+                    }
+                }
+                if (indexFound<0)
+                {
+                    indexFound = i;
+                }
+                strTmp = strCand.substring(0,indexFound)+strNum+strCand.substring(indexFound,strCand.length);
+                strCand = strTmp;
+                document.getElementById(candID).value = strCand;
+                }
+            }
+        }    
+    }
+}
+
+function addCandidateInRow(aNum,aCol,aRow)
+{
+    var row;
+    var col = aCol;
+    var candID;
+    var strCand;
+    var strTmp;
+    var strNum = aNum+"";
+    var indexFound;
+    
+    for (var countRow = 1; countRow<=tSize; countRow++)
+    {
+        row = countRow;
+        if (sCell[col][row].numGiven == 0)
+        {
+            if (isOK(aNum,col,row))
+            {
+                candID = "txtCandCol"+col+"Row"+row;
+                strCand = document.getElementById(candID).value;
+                if (strCand.indexOf(strNum)< 0)
+                {
+                indexFound = -1;
+                var candTmp;
+                var i =0;
+                while ( i<strCand.length && indexFound <0)
+                {
+                    candTmp = Number(strCand.charAt(i));
+                    if (aNum>candTmp)
+                    {
+                        i = i+1;
+                    }
+                    else
+                    {
+                        indexFound = i;
+                    }
+                }
+                if (indexFound<0)
+                {
+                    indexFound = i;
+                }
+                strTmp = strCand.substring(0,indexFound)+strNum+strCand.substring(indexFound,strCand.length);
+                strCand = strTmp;
+                document.getElementById(candID).value = strCand;
+                }
+            }
+        }    
+    }
+}
+
+function excCandidateInBCR(aNum,aCol,aRow)
+{
+    excCandidateInBlock(aNum,aCol,aRow);
+    excCandidateInCol(aNum,aCol,aRow);
+    excCandidateInRow(aNum,aCol,aRow);
+}
+
+function excCandidateInBlock(aNum,aCol,aRow)
+{
+    var row;
+    var col;
+    var candID;
+    var strCand;
+    var strTmp;
+    var strNum = aNum+"";
+    var indexFound;
+    
+    if (aCol<=3 && aRow<=3)
+    {
+        col = 1;
+        row = 1;
+    }
+    if (aCol>3 && aCol <=6 && aRow<=3)
+    {
+        col = 4;
+        row = 1;
+    }
+    if (aCol>6 && aRow<=3)
+    {
+        col = 7;
+        row = 1;
+    }
+    if (aCol<=3 && aRow>3 && aRow<=6)
+    {
+        col = 1;
+        row = 4;
+    }
+    if (aCol>3 && aCol <=6 && aRow>3 && aRow<=6)
+    {
+        col = 4;
+        row = 4;
+    }
+    if (aCol>6 && aRow>3 && aRow<=6)
+    {
+        col = 7;
+        row = 4;
+    }
+    if (aCol<=3 && aRow>6)
+    {
+        col = 1;
+        row = 7;
+    }
+    if (aCol>3 && aCol<=6 && aRow>6)
+    {
+        col = 4;
+        row = 7;
+    }
+    if (aCol>6 && aRow>6)
+    {
+        col = 7;
+        row = 7;
+    }    
+    
+    var tmpCol = col;
+    for (var countRow = 1; countRow<=3; countRow++)
+    {
+        col = tmpCol;
+        for (var countCol = 1; countCol<=3; countCol++)
+        {
+            if (sCell[col][row].numGiven == 0)
+            {
+                candID = "txtCandCol"+col+"Row"+row;
+                strCand = document.getElementById(candID).value;
+                indexFound = strCand.indexOf(strNum);
+                strTmp = strCand.substring(0,indexFound)+strCand.substring(indexFound+1,strCand.length);
+                strCand = strTmp;
+                document.getElementById(candID).value = strCand;
+            }
+            col = col+1;    
+        }
+        row = row+1;
+    } 
+}
+
+function excCandidateInCol(aNum,aCol,aRow)
+{
+    var row = aRow;
+    var col;
+    var candID;
+    var strCand;
+    var strTmp;
+    var strNum = aNum+"";
+    var indexFound;
+    
+    for (var countCol = 1; countCol<=tSize; countCol++)
+    {
+        col = countCol;
+        if (sCell[col][row].numGiven == 0)
+        {
+            candID = "txtCandCol"+col+"Row"+row;
+            strCand = document.getElementById(candID).value;
+            indexFound = strCand.indexOf(strNum);
+            strTmp = strCand.substring(0,indexFound)+strCand.substring(indexFound+1,strCand.length);
+            strCand = strTmp;
+            document.getElementById(candID).value = strCand;
+        }    
+    }
+}
+
+function excCandidateInRow(aNum,aCol,aRow)
+{
+    var row;
+    var col = aCol;
+    var candID;
+    var strCand;
+    var strTmp;
+    var strNum = aNum+"";
+    var indexFound;
+    
+    for (var countRow = 1; countRow<=tSize; countRow++)
+    {
+        row = countRow;
+        if (sCell[col][row].numGiven == 0)
+        {
+            candID = "txtCandCol"+col+"Row"+row;
+            strCand = document.getElementById(candID).value;
+            indexFound = strCand.indexOf(strNum);
+            strTmp = strCand.substring(0,indexFound)+strCand.substring(indexFound+1,strCand.length);
+            strCand = strTmp;
+            document.getElementById(candID).value = strCand;
+        }    
+    }
+}
+
+function isOK(aNum,aCol,aRow)
+{
+    if (!(findNumInRow(aNum,aRow)))
+    {
+        if (!(findNumInCol(aNum,aCol)))
+        {
+            if (!(findNumInBlock(aNum,aCol,aRow)))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    }
+    else
+    {
+        return false;
+    }
+}
+
+function findNumInBlock(aNum,aCol,aRow)
+{
+    var num = aNum;
+    var row;
+    var col;
+    
+    var block = sCell[aCol][aRow].block;
+    
+    row = 1;
+    while (row<=tSize)
+    {
+        col = 1;
+        while (col<=tSize)
+        {
+            if (sCell[col][row].block == block)
+            {
+                if (sCell[col][row].numGiven == num)
+                {
+                    return true;
+                }
+            }
+            col = col+1;
+        }
+        row = row+1;
+    }
+    return false;
+}
+
+function findNumInCol(aNum,aCol)
+{
+    var num = aNum;
+    var col = aCol;
+    var row = 1;
+    
+    while (row<=tSize)
+    {
+        if (sCell[col][row].numGiven == num)
+        {
+            return true;
+        }
+        row = row+1;
+    }
+    return false;
+}
+
+function findNumInRow(aNum,aRow)
+{
+    var num = aNum;
+    var row = aRow;
+    var col = 1;
+    
+    while (col<=tSize)
+    {
+        if (sCell[col][row].numGiven == num)
+        {
+            return true;
+        }
+        col = col+1;
+    }
+    return false;
+}
+function clearAnsAllCell()
+{
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            sCell[col][row].numGiven = 0;
+        }
+    }    
+}
+
+function clearCandidateAllCell()
+{
+    for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            sCell[col][row].clearCandidate();
+        }
+    }    
+}
+
+function shuffleCandidateAllCell()
+{
+for (var row=1; row<=tSize; row++)
+    {
+        for (var col=1; col<=tSize; col++)
+        {
+            sCell[col][row].shuffleCandidate();
+        }
+    }    
+}
+
+function createTable()
+{
+    var divTable = document.createElement("div");
+    divTable.setAttribute("id","SudokuTable");
+    divTable.setAttribute("style","width:800px; height:800px; background-color:#CCCCCC;");
+    
+    for (var row=1; row<=tSize; row++)
+    {
+        var divRow = document.createElement("div");
+        var rowID = "divRow"+row;
+		divRow.setAttribute("id",rowID);
+		divRow.setAttribute("style","width:800px; height:80px; background-color:#CCCCCC;");
+
+        for (var col=1; col<=tSize; col++)
+        {
+            var divCell = document.createElement("div");
+            var cellID = "divCol"+col+"Row"+row;
+            divCell.setAttribute("id",cellID);
+            divCell.setAttribute("style","width:80px; height:70px; float:left; background-color:#CCCCCC;");
+            
+            var txtCandidate = document.createElement("input");
+            txtCandidate.setAttribute("type","text");
+            var candID = "txtCandCol"+col+"Row"+row;
+            txtCandidate.setAttribute("id",candID);
+            txtCandidate.setAttribute("value","");
+            txtCandidate.setAttribute("style","width:75px; height:15px; color:green; background-color:#FFFFFF; text-align:center;");
+            
+            var myBR = document.createElement("br");
+            
+            var txtAns = document.createElement("input");
+            txtAns.setAttribute("type","text");
+            var ansID = "txtAnsCol"+col+"Row"+row;
+            txtAns.setAttribute("id",ansID);
+            txtAns.setAttribute("value","");
+            txtAns.setAttribute("readonly",true);
+            var myFn = "setNumToTxtAns("+col+","+row+")";
+            txtAns.setAttribute("onclick",myFn);
+            txtAns.setAttribute("style","width:75px; height:50px; font-size:30px; color:black; background-color:#FFFFFF; text-align:center;");
+            
+         	divCell.appendChild(txtCandidate);
+         	divCell.appendChild(myBR);
+         	divCell.appendChild(txtAns);
+
+            divRow.appendChild(divCell);
+            if (col == 3 || col == 6)
+            {
+                var divSpaceCol = document.createElement("div");
+                var spaceColID = "divSpaceCol";
+                divSpaceCol.setAttribute("id",spaceColID);
+                divSpaceCol.setAttribute("style","width:20px; height:70px; float:left;");  
+                
+                divRow.appendChild(divSpaceCol);         
+            }               
+        }
+        
+        divTable.appendChild(divRow);
+        if (row == 3 || row == 6)
+        {
+            var divSpaceRow = document.createElement("div");
+            var spaceRowID = "divSpaceRow";
+            divSpaceRow.setAttribute("id",spaceRowID);
+            divSpaceRow.setAttribute("style","width:7400px; height:20px;");
+            
+            divTable.appendChild(divSpaceRow);    
+        }
+    }
+    
+    var par = document.getElementById("divMyTable");
+    par.appendChild(divTable);
+    	
+}
+
+function SudokuCell(aCol,aRow)
+{
+    this.numGiven = 0;
+    this.candidate = new Array();
+    
+    this.col = Number(aCol);
+    this.row = Number(aRow);
+    
+    if (aCol<=3 && aRow<=3)
+    {
+        this.block = 1;
+    }
+    if (aCol>3 && aCol <=6 && aRow<=3)
+    {
+        this.block = 2;
+    }
+    if (aCol>6 && aRow<=3)
+    {
+        this.block = 3;
+    }
+    if (aCol<=3 && aRow>3 && aRow<=6)
+    {
+        this.block = 4;
+    }
+    if (aCol>3 && aCol <=6 && aRow>3 && aRow<=6)
+    {
+        this.block = 5;
+    }
+    if (aCol>6 && aRow>3 && aRow<=6)
+    {
+        this.block = 6;
+    }
+    if (aCol<=3 && aRow>6)
+    {
+        this.block = 7;
+    }
+    if (aCol>3 && aCol<=6 && aRow>6)
+    {
+        this.block = 8;
+    }
+    if (aCol>6 && aRow>6)
+    {
+        this.block = 9;
+    }    
+}
+SudokuCell.prototype.addCandidate = function(aNum)
+{
+    this.candidate.push(aNum);
+};
+SudokuCell.prototype.getCandidate = function()
+{
+    var str="";
+    for (var i=0;i<this.candidate.length;i++)
+    {
+        str = str+this.candidate[i];
+    }
+    return str;
+};
+SudokuCell.prototype.shuffleCandidate = function()
+{
+    var tmp = new Array(this.candidate.length);
+    var rdmNum;
+    var num;
+    //rdmNum = Math.floor(Math.random()*9)+1;
+    for (var i = 0; i<tmp.length; i++)
+    {
+        rdmNum = Math.floor(Math.random()*this.candidate.length);
+        num = this.candidate[rdmNum];
+        this.removeCandidate(num);
+        tmp[i] = num;    
+    }
+    
+    for (var i = 0; i<tmp.length; i++)
+    {
+        this.addCandidate(tmp[i]);
+    }
+    
+};
+
+SudokuCell.prototype.removeCandidate = function(aNum)
+{
+    var indexFound = -1;
+    var i = 0;
+    while (i<this.candidate.length && indexFound == -1)
+    {
+        if (aNum == this.candidate[i])
+        {
+            indexFound = i;
+        }
+        i = i+1;
+    }
+
+    this.candidate.splice(indexFound,1);
+    
+};
+
+SudokuCell.prototype.clearCandidate = function()
+{
+    while (this.candidate.length>0)
+    {
+        this.candidate.pop();
+    }
+};
+
+</script>
+</body>
+</html>
